@@ -1,0 +1,12 @@
+[package]
+name = "memmon"
+version = "0.1.0"
+edition = "2021"
+authors = ["lagovi"]
+description = "High-performance unified memory (RAM + SSD Swap) visualizer for Linux"
+license = "MIT"
+readme = "README.md"
+
+[dependencies]
+crossterm = "0.28"
+unicode-width = "0.2"
