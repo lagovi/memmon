@@ -120,7 +120,7 @@ pub fn render_frame(term_cols: u16, term_rows: u16, sys: &SystemMemory, procs: &
 
     let pad_t = inner_w.saturating_sub(title.width());
     let top_border = format!(
-        "{C_BORDER}┌─{C_RESET}{C_BOLD}{title}{C_RESET}{C_BORDER}{}┐{C_RESET}",
+        "{C_BORDER}┌─{C_RESET}{C_BOLD}{title}{C_RESET}{C_BORDER}{}┐{C_RESET}\r\n",
         "─".repeat(pad_t.saturating_sub(1))
     );
 
@@ -146,7 +146,6 @@ pub fn render_frame(term_cols: u16, term_rows: u16, sys: &SystemMemory, procs: &
         grid_2d.push(&stream_idx[start..end]);
     }
 
-    // Выбор оптимального сегмента для отображения текстовой метки
     let mut runs_by_item: Vec<Vec<(usize, usize, usize, usize)>> = vec![Vec::new(); items.len()];
     for r in 0..grid_rows {
         let mut cur_it: Option<usize> = None;
@@ -184,23 +183,20 @@ pub fn render_frame(term_cols: u16, term_rows: u16, sys: &SystemMemory, procs: &
 
     let box_line = |content: &str| -> String {
         let v_len = content.width();
-        let pad = inner_w.saturating_sub(v_len + 2);
-        format!("{C_BORDER}│{C_RESET} {content}{}{C_BORDER}│{C_RESET}", " ".repeat(pad))
+        let pad = inner_w.saturating_sub(v_len);
+        format!("{C_BORDER}│{C_RESET}{content}{}{C_BORDER}│{C_RESET}\r\n", " ".repeat(pad))
     };
 
     let mut out = String::with_capacity(4096);
     out.push_str(&top_border);
-    out.push('\n');
 
     let sub_line = format!(
-        "{C_MUTED}Совокупная память:{C_RESET} {C_BOLD}{}{C_RESET}  {C_MUTED}| RAM: {} | Swap: {}{C_RESET}",
+        " {C_MUTED}Совокупная память:{C_RESET} {C_BOLD}{}{C_RESET}  {C_MUTED}| RAM: {} | Swap: {}{C_RESET}",
         fmt_size(total_uni), t_ram, t_ssd
     );
     out.push_str(&box_line(&sub_line));
-    out.push('\n');
-    out.push_str(&format!("{C_BORDER}├{}┤{C_RESET}\n", "─".repeat(inner_w)));
+    out.push_str(&format!("{C_BORDER}├{}┤{C_RESET}\r\n", "─".repeat(inner_w)));
 
-    // Матрица блоков
     let grid_w = grid_cols * 2 - 1;
     let pad_left = (inner_w.saturating_sub(grid_w)) / 2;
     let pad_right = inner_w.saturating_sub(grid_w + pad_left);
@@ -271,15 +267,14 @@ pub fn render_frame(term_cols: u16, term_rows: u16, sys: &SystemMemory, procs: &
 
         let line_content = seg_rendered.join(" ");
         out.push_str(&format!(
-            "{C_BORDER}│{C_RESET}{}{line_content}{}{C_BORDER}│{C_RESET}\n",
+            "{C_BORDER}│{C_RESET}{}{line_content}{}{C_BORDER}│{C_RESET}\r\n",
             " ".repeat(pad_left),
             " ".repeat(pad_right)
         ));
     }
 
-    out.push_str(&format!("{C_BORDER}├{}┤{C_RESET}\n", "─".repeat(inner_w)));
-    out.push_str(&box_line(&format!("{C_BOLD}РАСПРЕДЕЛЕНИЕ ОБЪЕДИНЕННОЙ ПАМЯТИ (ТОП ПОТРЕБИТЕЛЕЙ):{C_RESET}")));
-    out.push('\n');
+    out.push_str(&format!("{C_BORDER}├{}┤{C_RESET}\r\n", "─".repeat(inner_w)));
+    out.push_str(&box_line(&format!(" {C_BOLD}РАСПРЕДЕЛЕНИЕ ОБЪЕДИНЕННОЙ ПАМЯТИ (ТОП ПОТРЕБИТЕЛЕЙ):{C_RESET}")));
 
     let format_item = |it: Option<&LayoutItem>, width: usize| -> String {
         let it = match it {
@@ -320,22 +315,21 @@ pub fn render_frame(term_cols: u16, term_rows: u16, sys: &SystemMemory, procs: &
             let txt_l = format_item(it_l, col_w);
             let txt_r = format_item(it_r, col_w);
             let rem_sp = inner_w.saturating_sub(col_w * 2 + 3);
-            out.push_str(&format!("{C_BORDER}│{C_RESET} {txt_l} {C_BORDER}│{C_RESET} {txt_r}{}{C_BORDER}│{C_RESET}\n", " ".repeat(rem_sp)));
+            out.push_str(&format!("{C_BORDER}│{C_RESET} {txt_l} {C_BORDER}│{C_RESET} {txt_r}{}{C_BORDER}│{C_RESET}\r\n", " ".repeat(rem_sp)));
         }
     } else {
         for it in &items {
             let txt = format_item(Some(it), inner_w.saturating_sub(2));
-            out.push_str(&format!("{C_BORDER}│{C_RESET} {txt} {C_BORDER}│{C_RESET}\n"));
+            out.push_str(&format!("{C_BORDER}│{C_RESET} {txt} {C_BORDER}│{C_RESET}\r\n"));
         }
     }
 
-    out.push_str(&format!("{C_BORDER}├{}┤{C_RESET}\n", "─".repeat(inner_w)));
+    out.push_str(&format!("{C_BORDER}├{}┤{C_RESET}\r\n", "─".repeat(inner_w)));
     let avail_str = format!(
         "  {C_BOLD}Доступно для запуска новых задач:{C_RESET} {}{C_BOLD}{}{C_RESET}",
         PALETTE_TOP10[0], fmt_size(sys.total_avail)
     );
     out.push_str(&box_line(&avail_str));
-    out.push('\n');
 
     let hint = " [q / Esc - выход] ";
     let pad_b = inner_w.saturating_sub(hint.width() + 2);

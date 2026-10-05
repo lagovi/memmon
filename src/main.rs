@@ -13,7 +13,6 @@ use std::io::{self, stdout, Write};
 use std::time::Duration;
 
 fn main() -> io::Result<()> {
-    // Правило 14: Первый вывод консоли начинается строго с трех переводов строк
     println!("\n\n\nИнициализация монитора памяти memmon (Rust)...");
     std::thread::sleep(Duration::from_millis(150));
 
@@ -21,7 +20,8 @@ fn main() -> io::Result<()> {
         let (cols, rows) = crossterm::terminal::size().unwrap_or((80, 24));
         let sys = mem::get_system_memory();
         let procs = process::get_top_consumers(10);
-        println!("{}", layout::render_frame(cols, rows, &sys, &procs));
+        let frame = layout::render_frame(cols, rows, &sys, &procs);
+        print!("{}", frame.replace("\r\n", "\n"));
         return Ok(());
     }
 
