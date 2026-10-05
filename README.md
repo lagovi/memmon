@@ -20,6 +20,7 @@ Instead of navigating complex process trees, `memmon` models your physical RAM a
 - **Embedded In-Grid Badges**: Embeds `[ process · size ]` labels inside the largest contiguous runs in the color matrix.
 - **Hamilton Apportionment**: Uses the largest remainder algorithm to ensure grid cells always add up to 100% without rounding drift.
 - **Adaptive 2-Column TUI**: Recalculates matrix and legend on terminal resize (`SIGWINCH`), organizing consumers into two balanced columns when width permits.
+- **Internationalization (EN / RU)**: Bilingual interface with auto-detection from system locale, CLI flags (`--en`, `--ru`, `--lang`), and instant on-the-fly toggling via the `l` key.
 - **Static Binary**: Standalone executable (~879 KiB, compiled with `musl libc`) with zero shared library dependencies.
 
 ---
@@ -31,6 +32,7 @@ Instead of navigating complex process trees, `memmon` models your physical RAM a
 Download the standalone binary from the [latest GitHub Release](https://github.com/lagovi/memmon/releases/latest):
 
 ```bash
+mkdir -p ~/bin
 curl -L -o ~/bin/memmon https://github.com/lagovi/memmon/releases/latest/download/memmon
 chmod +x ~/bin/memmon
 ```
@@ -40,7 +42,7 @@ chmod +x ~/bin/memmon
 ### Option 2: GitHub CLI
 
 ```bash
-gh release download v0.1.0 -R lagovi/memmon -p memmon -D ~/bin/
+gh release download -R lagovi/memmon -p memmon -D ~/bin/
 chmod +x ~/bin/memmon
 ```
 
@@ -57,15 +59,26 @@ cargo build --release --target x86_64-unknown-linux-musl
 ## Usage
 
 ```bash
+# Launch with auto-detected language
 memmon
+
+# Force English interface
+memmon --en
+
+# Force Russian interface
+memmon --ru
+
+# View CLI options
+memmon --help
 ```
 
 ### Keybindings
 
 | Key | Action |
 | :--- | :--- |
-| `q` or `Q` | Exit |
-| `Esc` | Exit |
+| `l` or `L` | **Toggle language live** (`EN` ⇄ `RU`) |
+| `q` or `Q` | Exit `memmon` |
+| `Esc` | Exit `memmon` |
 | `Ctrl + C` | Clean terminal teardown and exit |
 
 ---
@@ -74,7 +87,7 @@ memmon
 
 - **`src/mem.rs`**: Parser for `/proc/meminfo` and `/proc/swaps` (filters out zram to accurately track disk swap).
 - **`src/process.rs`**: Traverses `/proc/[pid]`, computes anonymous RSS + VmSwap, resolves cwd symlinks, and aggregates instances.
-- **`src/layout.rs`**: Geometry engine, Hamilton apportionment, ANSI-aware string width calculation (`visible_width`), and TUI renderer.
+- **`src/layout.rs`**: Geometry engine, i18n localization (`Language`), Hamilton apportionment, ANSI-aware string width calculation (`visible_width`), and TUI renderer.
 - **`src/terminal.rs`**: RAII terminal guard with custom panic hook to guarantee restoration from raw/alternate mode.
 
 ---

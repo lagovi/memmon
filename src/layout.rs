@@ -2,6 +2,53 @@ use unicode_width::UnicodeWidthStr;
 use crate::mem::SystemMemory;
 use crate::process::ProcessConsumer;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Language {
+    En,
+    Ru,
+}
+
+impl Language {
+    pub fn toggle(&self) -> Self {
+        match self {
+            Language::En => Language::Ru,
+            Language::Ru => Language::En,
+        }
+    }
+
+    pub fn from_env_and_args() -> Self {
+        let args: Vec<String> = std::env::args().collect();
+        for (i, arg) in args.iter().enumerate() {
+            if arg == "--ru" || arg == "-ru" {
+                return Language::Ru;
+            }
+            if arg == "--en" || arg == "-en" {
+                return Language::En;
+            }
+            if (arg == "--lang" || arg == "-l") && i + 1 < args.len() {
+                if args[i + 1].to_lowercase().starts_with("ru") {
+                    return Language::Ru;
+                }
+                if args[i + 1].to_lowercase().starts_with("en") {
+                    return Language::En;
+                }
+            }
+        }
+
+        // Автоопределение из локали системы
+        if let Ok(lang) = std::env::var("LC_ALL")
+            .or_else(|_| std::env::var("LC_MESSAGES"))
+            .or_else(|_| std::env::var("LANG"))
+        {
+            if lang.to_lowercase().contains("ru") {
+                return Language::Ru;
+            }
+        }
+
+        Language::En
+    }
+}
+
 pub const PALETTE_TOP10: [&str; 10] = [
     "\x1b[38;5;48m",   // 1. Мятный зеленый
     "\x1b[38;5;51m",   // 2. Яркий циан
@@ -43,7 +90,6 @@ pub fn fmt_size(bytes: u64) -> String {
     }
 }
 
-/// Точный подсчет видимой ширины в терминале с фильтрацией ANSI escape-последовательностей
 pub fn visible_width(s: &str) -> usize {
     let mut in_escape = false;
     let mut clean = String::with_capacity(s.len());
@@ -89,7 +135,7 @@ pub fn allocate_cells(items: &[LayoutItem], total_cells: usize, total_mem: u64) 
     floored
 }
 
-pub fn render_frame(term_cols: u16, term_rows: u16, sys: &SystemMemory, procs: &[ProcessConsumer]) -> String {
+pub fn render_frame(term_cols: u16, term_rows: u16, sys: &SystemMemory, procs: &[ProcessConsumer], lang: Language) -> String {
     let total_uni = sys.total_unified;
     let top_mem_sum: u64 = procs.iter().map(|p| p.mem).sum();
     let cache_mem = sys.total_cache;
@@ -107,21 +153,34 @@ pub fn render_frame(term_cols: u16, term_rows: u16, sys: &SystemMemory, procs: &
         });
     }
 
+    let (other_name, other_short) = match lang {
+        Language::Ru => ("Всё остальное", "Всё остальное"),
+        Language::En => ("Other processes & kernel", "Other"),
+    };
+    let (cache_name, cache_short) = match lang {
+        Language::Ru => ("Суммарный кэш + буферы", "Кэш + буферы"),
+        Language::En => ("Buffers & page cache", "Cache & buffers"),
+    };
+    let (free_name, free_short) = match lang {
+        Language::Ru => ("Абсолютно свободно", "Свободно"),
+        Language::En => ("Unallocated (RAM+Swap)", "Free"),
+    };
+
     items.push(LayoutItem {
-        name: "Всё остальное".to_string(),
-        short_name: "Всё остальное".to_string(),
+        name: other_name.to_string(),
+        short_name: other_short.to_string(),
         mem: other_mem,
         color: C_OTHER,
     });
     items.push(LayoutItem {
-        name: "Суммарный кэш + буферы".to_string(),
-        short_name: "Кэш + буферы".to_string(),
+        name: cache_name.to_string(),
+        short_name: cache_short.to_string(),
         mem: cache_mem,
         color: C_CACHE,
     });
     items.push(LayoutItem {
-        name: "Абсолютно свободно".to_string(),
-        short_name: "Свободно".to_string(),
+        name: free_name.to_string(),
+        short_name: free_short.to_string(),
         mem: free_mem,
         color: C_FREE,
     });
@@ -131,9 +190,19 @@ pub fn render_frame(term_cols: u16, term_rows: u16, sys: &SystemMemory, procs: &
 
     let t_ram = fmt_size(sys.total_ram);
     let t_ssd = fmt_size(sys.ssd_total);
-    let mut title = format!(" ЕДИНОЕ ПРОСТРАНСТВО ПАМЯТИ (RAM {} + SSD SWAP {}) ", t_ram, t_ssd);
+
+    let title_prefix = match lang {
+        Language::Ru => "ЕДИНОЕ ПРОСТРАНСТВО ПАМЯТИ",
+        Language::En => "UNIFIED MEMORY SPACE",
+    };
+    let title_short_prefix = match lang {
+        Language::Ru => "ЕДИНАЯ ПАМЯТЬ",
+        Language::En => "UNIFIED MEMORY",
+    };
+
+    let mut title = format!(" {} (RAM {} + SSD SWAP {}) ", title_prefix, t_ram, t_ssd);
     if title.width() > inner_w.saturating_sub(4) {
-        title = format!(" ЕДИНАЯ ПАМЯТЬ ({}) ", fmt_size(total_uni));
+        title = format!(" {} ({}) ", title_short_prefix, fmt_size(total_uni));
     }
 
     let pad_t = inner_w.saturating_sub(title.width());
@@ -208,9 +277,13 @@ pub fn render_frame(term_cols: u16, term_rows: u16, sys: &SystemMemory, procs: &
     let mut out = String::with_capacity(4096);
     out.push_str(&top_border);
 
+    let sub_total_lbl = match lang {
+        Language::Ru => "Совокупная память",
+        Language::En => "Total unified memory",
+    };
     let sub_line = format!(
-        " {C_MUTED}Совокупная память:{C_RESET} {C_BOLD}{}{C_RESET}  {C_MUTED}| RAM: {} | Swap: {}{C_RESET}",
-        fmt_size(total_uni), t_ram, t_ssd
+        " {C_MUTED}{}:{C_RESET} {C_BOLD}{}{C_RESET}  {C_MUTED}| RAM: {} | Swap: {}{C_RESET}",
+        sub_total_lbl, fmt_size(total_uni), t_ram, t_ssd
     );
     out.push_str(&box_line(&sub_line));
     out.push_str(&format!("{C_BORDER}├{}┤{C_RESET}\r\n", "─".repeat(inner_w)));
@@ -292,7 +365,12 @@ pub fn render_frame(term_cols: u16, term_rows: u16, sys: &SystemMemory, procs: &
     }
 
     out.push_str(&format!("{C_BORDER}├{}┤{C_RESET}\r\n", "─".repeat(inner_w)));
-    out.push_str(&box_line(&format!(" {C_BOLD}РАСПРЕДЕЛЕНИЕ ОБЪЕДИНЕННОЙ ПАМЯТИ (ТОП ПОТРЕБИТЕЛЕЙ):{C_RESET}")));
+
+    let section_lbl = match lang {
+        Language::Ru => "РАСПРЕДЕЛЕНИЕ ОБЪЕДИНЕННОЙ ПАМЯТИ (ТОП ПОТРЕБИТЕЛЕЙ):",
+        Language::En => "UNIFIED MEMORY DISTRIBUTION (TOP CONSUMERS):",
+    };
+    out.push_str(&box_line(&format!(" {C_BOLD}{}{C_RESET}", section_lbl)));
 
     let format_item = |it: Option<&LayoutItem>, width: usize| -> String {
         let it = match it {
@@ -345,13 +423,21 @@ pub fn render_frame(term_cols: u16, term_rows: u16, sys: &SystemMemory, procs: &
     }
 
     out.push_str(&format!("{C_BORDER}├{}┤{C_RESET}\r\n", "─".repeat(inner_w)));
+
+    let avail_lbl = match lang {
+        Language::Ru => "Доступно для запуска новых задач:",
+        Language::En => "Available for new workloads:",
+    };
     let avail_str = format!(
-        "  {C_BOLD}Доступно для запуска новых задач:{C_RESET} {}{C_BOLD}{}{C_RESET}",
-        PALETTE_TOP10[0], fmt_size(sys.total_avail)
+        "  {C_BOLD}{}{C_RESET} {}{C_BOLD}{}{C_RESET}",
+        avail_lbl, PALETTE_TOP10[0], fmt_size(sys.total_avail)
     );
     out.push_str(&box_line(&avail_str));
 
-    let hint = " [q / Esc - выход] ";
+    let hint = match lang {
+        Language::Ru => " [q / Esc - выход | l - язык] ",
+        Language::En => " [q / Esc - exit | l - lang] ",
+    };
     let pad_b = inner_w.saturating_sub(hint.width() + 2);
     out.push_str(&format!("{C_BORDER}└{}─{C_MUTED}{hint}{C_RESET}{C_BORDER}─┘{C_RESET}", "─".repeat(pad_b)));
 
