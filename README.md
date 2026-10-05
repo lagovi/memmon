@@ -21,7 +21,7 @@ Instead of navigating complex process trees, `memmon` models your physical RAM a
 - **Hamilton Apportionment**: Uses the largest remainder algorithm to ensure grid cells always add up to 100% without rounding drift.
 - **Adaptive 2-Column TUI**: Recalculates matrix and legend on terminal resize (`SIGWINCH`), organizing consumers into two balanced columns when width permits.
 - **Internationalization (EN / RU)**: Bilingual interface with auto-detection from system locale, CLI flags (`--en`, `--ru`, `--lang`), and instant on-the-fly toggling via the `l` key.
-- **Static Binary**: Standalone executable (~879 KiB, compiled with `musl libc`) with zero shared library dependencies.
+- **Static Binary**: Standalone executable (~902 KiB, compiled with `musl libc`) with zero shared library dependencies.
 
 ---
 
