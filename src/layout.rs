@@ -43,6 +43,24 @@ pub fn fmt_size(bytes: u64) -> String {
     }
 }
 
+/// Точный подсчет видимой ширины в терминале с фильтрацией ANSI escape-последовательностей
+pub fn visible_width(s: &str) -> usize {
+    let mut in_escape = false;
+    let mut clean = String::with_capacity(s.len());
+    for ch in s.chars() {
+        if ch == '\x1b' {
+            in_escape = true;
+        } else if in_escape {
+            if ch.is_ascii_alphabetic() {
+                in_escape = false;
+            }
+        } else {
+            clean.push(ch);
+        }
+    }
+    clean.width()
+}
+
 pub fn allocate_cells(items: &[LayoutItem], total_cells: usize, total_mem: u64) -> Vec<usize> {
     if total_cells == 0 || total_mem == 0 {
         return vec![0; items.len()];
@@ -182,7 +200,7 @@ pub fn render_frame(term_cols: u16, term_rows: u16, sys: &SystemMemory, procs: &
     }
 
     let box_line = |content: &str| -> String {
-        let v_len = content.width();
+        let v_len = visible_width(content);
         let pad = inner_w.saturating_sub(v_len);
         format!("{C_BORDER}│{C_RESET}{content}{}{C_BORDER}│{C_RESET}\r\n", " ".repeat(pad))
     };
@@ -300,12 +318,14 @@ pub fn render_frame(term_cols: u16, term_rows: u16, sys: &SystemMemory, procs: &
 
         let left = format!(" {}{SYM}{C_RESET} {C_BOLD}{name_str}{C_RESET}", it.color);
         let right = format!("{val_str:>9} ({pct:>4.1}%)");
-        let sp = width.saturating_sub(left.width() + right.width()).max(1);
+        let v_left = visible_width(&left);
+        let v_right = visible_width(&right);
+        let sp = width.saturating_sub(v_left + v_right);
         format!("{left}{}{right}", " ".repeat(sp))
     };
 
     if two_columns {
-        let col_w = (inner_w.saturating_sub(3)) / 2;
+        let col_w = (inner_w.saturating_sub(4)) / 2;
         let left_items = &items[..items.len().min(7)];
         let right_items = &items[items.len().min(7)..];
 
@@ -314,8 +334,8 @@ pub fn render_frame(term_cols: u16, term_rows: u16, sys: &SystemMemory, procs: &
             let it_r = right_items.get(row_i);
             let txt_l = format_item(it_l, col_w);
             let txt_r = format_item(it_r, col_w);
-            let rem_sp = inner_w.saturating_sub(col_w * 2 + 3);
-            out.push_str(&format!("{C_BORDER}│{C_RESET} {txt_l} {C_BORDER}│{C_RESET} {txt_r}{}{C_BORDER}│{C_RESET}\r\n", " ".repeat(rem_sp)));
+            let rem_sp = inner_w.saturating_sub(col_w * 2 + 4);
+            out.push_str(&format!("{C_BORDER}│{C_RESET} {txt_l} {C_BORDER}│{C_RESET} {txt_r} {}{C_BORDER}│{C_RESET}\r\n", " ".repeat(rem_sp)));
         }
     } else {
         for it in &items {
