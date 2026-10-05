@@ -304,7 +304,7 @@ pub fn render_frame(term_cols: u16, term_rows: u16, sys: &SystemMemory, procs: &
         };
 
         let left = format!(" {}{SYM}{C_RESET} {C_BOLD}{name_str}{C_RESET}", it.color);
-        let right = format!("{val_str:>9} ({pct:>4.1f}%)");
+        let right = format!("{val_str:>9} ({pct:>4.1}%)");
         let sp = width.saturating_sub(left.width() + right.width()).max(1);
         format!("{left}{}{right}", " ".repeat(sp))
     };
